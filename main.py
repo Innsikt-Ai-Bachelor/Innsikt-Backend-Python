@@ -2,7 +2,7 @@ from typing import Union
 
 from fastapi import FastAPI
 
-from .routers import users
+from routers import users
 
 app = FastAPI()
 
