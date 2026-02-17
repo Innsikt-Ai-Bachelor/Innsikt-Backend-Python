@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth import create_access_token
+from ..auth import create_access_token, get_current_user
 from ..database import get_session
 from ..models.db import User
 from ..models.login import LoginRequest, LoginResponse
@@ -37,6 +37,39 @@ async def register_user(user_in: UserCreate, session: AsyncSession = Depends(get
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username or email already exists",
+        )
+    await session.refresh(user)
+    return UserPublic(username=user.username, email=user.email, full_name=user.full_name)
+
+@router.put("/users/{username}", response_model=UserPublic)
+async def update_user(
+    username: str, 
+    user_in: UserCreate, 
+    session: AsyncSession = Depends(get_session),
+    current_user: str = Depends(get_current_user)
+):
+    # Check if the logged-in user is trying to update their own profile
+    if current_user != username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update your own user information"
+        )
+    
+    result = await session.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    user.email = user_in.email
+    user.full_name = user_in.full_name
+    if user_in.password:
+        user.password_hash = hash_password(user_in.password)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already exists",
         )
     await session.refresh(user)
     return UserPublic(username=user.username, email=user.email, full_name=user.full_name)

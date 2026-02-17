@@ -2,7 +2,9 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from jose import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 
 
 @dataclass(frozen=True)
@@ -31,3 +33,33 @@ def create_access_token(subject: str, user_id: int) -> str:
         "exp": int(expire.timestamp()),
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+security = HTTPBearer()
+
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT token and return the payload"""
+    settings = get_jwt_settings()
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_user(token_payload: dict = Depends(verify_token)) -> str:
+    """Extract username from verified token"""
+    username: str = token_payload.get("sub")
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+    return username
+
