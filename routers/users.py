@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..auth import create_access_token, get_current_user
-from ..database import get_session
-from ..models.db import User
-from ..models.login import LoginRequest, LoginResponse
-from ..models.users import UserCreate, UserPublic, UserUpdate, hash_password, verify_password
+from auth import create_access_token, get_current_user
+from database import get_session
+from models.db import User
+from models.login import LoginRequest, LoginResponse
+from models.users import UserCreate, UserPublic, UserUpdate, hash_password, verify_password
 
 router = APIRouter()
 
