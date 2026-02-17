@@ -7,7 +7,7 @@ from ..auth import create_access_token, get_current_user
 from ..database import get_session
 from ..models.db import User
 from ..models.login import LoginRequest, LoginResponse
-from ..models.users import UserCreate, UserPublic, hash_password, verify_password
+from ..models.users import UserCreate, UserPublic, UserUpdate, hash_password, verify_password
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ async def register_user(user_in: UserCreate, session: AsyncSession = Depends(get
 @router.put("/users/{username}", response_model=UserPublic)
 async def update_user(
     username: str, 
-    user_in: UserCreate, 
+    user_in: UserUpdate, 
     session: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user)
 ):
@@ -59,9 +59,11 @@ async def update_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    user.email = user_in.email
-    user.full_name = user_in.full_name
-    if user_in.password:
+    if user_in.email is not None:
+        user.email = user_in.email
+    if user_in.full_name is not None:
+        user.full_name = user_in.full_name
+    if user_in.password is not None:
         user.password_hash = hash_password(user_in.password)
     try:
         await session.commit()

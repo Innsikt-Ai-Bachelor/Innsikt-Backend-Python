@@ -17,6 +17,12 @@ class UserPublic(BaseModel):
     full_name: str | None = None
 
 
+class UserUpdate(BaseModel):
+    email: EmailStr | None = None
+    full_name: str | None = None
+    password: str | None = None
+
+
 class UserInDB(BaseModel):
     id: int
     username: str
