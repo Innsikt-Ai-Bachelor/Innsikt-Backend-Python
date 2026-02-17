@@ -12,7 +12,10 @@ from ..models.users import UserCreate, UserPublic, hash_password, verify_passwor
 router = APIRouter()
 
 @router.get("/users/", response_model=list[UserPublic])
-async def read_users(session: AsyncSession = Depends(get_session)):
+async def read_users(
+    session: AsyncSession = Depends(get_session),
+    current_user: str = Depends(get_current_user)
+):
     result = await session.execute(select(User))
     users = result.scalars().all()
     return [
