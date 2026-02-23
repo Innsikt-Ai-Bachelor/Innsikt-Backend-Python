@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Literal, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
 
 
 Role = Literal["user", "assistant", "system"]
@@ -12,14 +12,14 @@ class CreateSessionResponse(BaseModel):
 class ChatMessageRequest(BaseModel):
     session_id: str
     message: str
-    # Valgfritt: hvis frontend vil sende ekstra info senere
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Source(BaseModel):
     source: str
+    doc_id: Optional[str] = None
     chunk_id: Optional[int] = None
-    extra: Dict[str, Any] = Field(default_factory=dict)
+    meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatMessageResponse(BaseModel):
