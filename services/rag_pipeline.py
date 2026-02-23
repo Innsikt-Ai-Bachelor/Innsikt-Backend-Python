@@ -69,7 +69,7 @@ async def answer_question(
     doc_id: str | None = None,
 ) -> Tuple[str, List[Dict[str, Any]]]:
     q_emb = await embed_query(question)
-    rows = await search_similar(session=session, query_embedding=q_emb, k=k, doc_id=doc_id)
+    rows = await search_similar(session=session, query_embedding=q_emb, k=k)
     context = _format_context(rows)
 
     system = (
