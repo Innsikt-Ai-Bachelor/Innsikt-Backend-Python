@@ -12,7 +12,7 @@ def _client() -> AsyncOpenAI:
 
 
 def get_embedding_model() -> str:
-    # RagChunk.EMBED_DIM is 1536, so default to text-embedding-3-small.
+    # models.rag.EMBED_DIM is 1536, so default to text-embedding-3-small.
     return os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 
