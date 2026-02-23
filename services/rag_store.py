@@ -33,7 +33,7 @@ async def insert_chunks(
 
 async def search_similar(
     session: AsyncSession,
-    query_embedding,
+    query_embedding: list[float],
     k: int = 5,
     doc_id: str | None = None,
 ):

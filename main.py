@@ -14,6 +14,11 @@ app.include_router(rag.router)
 async def on_startup():
     await init_db()
 
+
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
