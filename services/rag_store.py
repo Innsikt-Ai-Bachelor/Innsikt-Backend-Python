@@ -24,7 +24,11 @@ async def insert_chunks(
     ]
 
     session.add_all(rows)
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
 
 
 async def search_similar(session, query_embedding, k: int = 5):
