@@ -31,7 +31,7 @@ async def rag_ask(
     _ = current_user
     try:
         answer, sources = await answer_question(session=session, question=req.question, k=req.k, doc_id=req.doc_id)
-    except RuntimeError as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     return AskResponse(
