@@ -57,7 +57,7 @@ async def ingest_documents(
 def _format_context(rows) -> str:
     parts = []
     for r in rows:
-        src = r.meta.get("source", r.doc_id)
+        src = (r.meta or {}).get("source", r.doc_id)
         parts.append(f"[doc_id={r.doc_id} source={src} chunk_id={r.id}]\n{r.chunk_text}")
     return "\n\n---\n\n".join(parts)
 
