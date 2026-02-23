@@ -1,19 +1,8 @@
 from fastapi import FastAPI
 
-try:
-    from routers import users
-except ImportError:
-    from routers import users
-
-try:
-    from routers import chat, rag
-except ImportError:
-    from routers import chat, rag
-
-try:
-    from .database import init_db
-except ImportError:
-    from database import init_db
+from routers import users
+from routers import chat, rag
+from database import init_db
 app = FastAPI()
 
 app.include_router(users.router)
