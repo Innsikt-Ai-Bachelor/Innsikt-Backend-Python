@@ -27,10 +27,6 @@ async def insert_chunks(
     await session.commit()
 
 
-# IKKE importer cosine_distance
-from sqlalchemy import select
-from models.rag import RagChunk  # eller hva chunk-modellen heter
-
 async def search_similar(session, query_embedding, k: int = 5):
     stmt = (
         select(RagChunk)
