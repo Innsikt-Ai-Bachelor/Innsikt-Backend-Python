@@ -1,7 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pgvector.sqlalchemy import cosine_distance
-
 from models.rag import RagChunk
 
 
@@ -26,7 +24,11 @@ async def insert_chunks(
     ]
 
     session.add_all(rows)
-    await session.commit()
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        raise
 
 
 async def search_similar(
@@ -36,14 +38,8 @@ async def search_similar(
     doc_id: str | None = None,
 ):
     stmt = select(RagChunk)
-
-    if doc_id:
+    if doc_id is not None:
         stmt = stmt.where(RagChunk.doc_id == doc_id)
-
-    stmt = (
-        stmt.order_by(cosine_distance(RagChunk.embedding, query_embedding))
-        .limit(k)
-    )
-
-    result = await session.execute(stmt)
-    return result.scalars().all()
+    stmt = stmt.order_by(RagChunk.embedding.cosine_distance(query_embedding)).limit(k)
+    res = await session.execute(stmt)
+    return list(res.scalars().all())
