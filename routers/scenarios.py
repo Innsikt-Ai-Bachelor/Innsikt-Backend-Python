@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List, Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import verify_token
@@ -32,7 +33,20 @@ async def start_scenario_session(
 
     sc_session = ScenarioSession(user_id=user_id, scenario_id=scenario.id)
     session.add(sc_session)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Scenario session could not be created due to a conflict",
+        )
+    except Exception:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred while creating the scenario session",
+        )
     await session.refresh(sc_session)
     return sc_session
 
