@@ -7,6 +7,7 @@ class Scenario(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
+    difficulty = Column(String(20), nullable=True)
 
     # brukes for filtering i appen (f.eks "konflikt", "skole", "skjermtid")
     category = Column(String(60), nullable=True)
