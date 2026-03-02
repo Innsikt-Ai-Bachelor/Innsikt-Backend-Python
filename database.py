@@ -35,5 +35,6 @@ async def init_db() -> None:
         _init_engine()
     import models.db
     import models.rag
+    import models.session_db
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
