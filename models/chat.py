@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Literal, Optional
 
@@ -51,3 +53,17 @@ class FinishResponse(BaseModel):
 class StoredMessage(BaseModel):
     role: Role
     content: str
+
+
+class CreateSessionRequest(BaseModel):
+    scenario_id: int
+    title: str
+
+
+class SessionListItem(BaseModel):
+    session_id: str
+    scenario_id: int | None
+    title: str | None
+    saved_at: datetime
+    turn_count: int
+    last_message_preview: str | None
