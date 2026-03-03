@@ -1,7 +1,9 @@
 from fastapi import FastAPI
-
+from dotenv import load_dotenv
 from routers import users, chat, rag, scenarios  
 from database import init_db
+
+load_dotenv()
 
 app = FastAPI()
 
