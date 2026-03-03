@@ -1,5 +1,6 @@
 import os
 from typing import List
+from typing import Any, Dict
 
 from openai import AsyncOpenAI
 
@@ -42,5 +43,20 @@ async def chat_complete(system: str, user: str) -> str:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
+    )
+    return resp.choices[0].message.content or ""
+
+async def chat_complete_messages(
+    messages: list[dict[str, str]],
+    temperature: float = 0.4,
+) -> str:
+    """
+    messages: [{"role": "system|user|assistant", "content": "..."}]
+    """
+    client = _client()
+    model = get_chat_model()
+    resp = await client.chat.completions.create(
+        model=model,
+        messages=messages,
     )
     return resp.choices[0].message.content or ""

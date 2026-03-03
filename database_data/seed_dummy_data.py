@@ -41,7 +41,11 @@ async def seed_dummy_data() -> None:
                         description="Forelder og barn er uenige om leggetid på hverdager.",
                         difficulty="easy",
                         category="skjermtid",
-                        system_prompt="Du er en hjelpsom coach som hjelper foreldre med rolig og tydelig kommunikasjon rundt leggetid.",
+                        system_prompt=(
+                        "Du er et barn (ca. 7 år) som ikke vil legge deg på hverdager. "
+                        "Du vil heller leke/se skjerm og synes det er urettferdig. "
+                        "Du svarer KUN som barnet. 1–2 setninger. Ingen råd eller voksenforklaringer."
+                        ),
                         is_active=True,
                     ),
                     Scenario(

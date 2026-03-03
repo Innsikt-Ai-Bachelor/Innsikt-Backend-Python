@@ -1,4 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+import os
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database import get_session
+from models.scenario import Scenario
+from services.chat_session_store import get_session_meta
 
 from auth import get_current_user
 from models.chat import (
@@ -16,31 +25,75 @@ from services.chat_session_store import (
     get_messages,
     session_exists,
 )
+from services.openai_client import chat_complete_messages
+class CreateSessionRequest(BaseModel):
+    scenario_id: Optional[int] = None
+    title: Optional[str] = None
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 @router.post("/session", response_model=CreateSessionResponse)
-async def create_chat_session(current_user: str = Depends(get_current_user)):
-    # Session is tied to an authenticated user (at least in API usage).
-    # For now we only return a session_id; a DB store later can store user_id as well.
+async def create_chat_session(
+    req: Optional[CreateSessionRequest] = None,
+    current_user: str = Depends(get_current_user),
+):
     _ = current_user
-    session_id = create_session()
+    scenario_id = req.scenario_id if req else None
+    title = req.title if req else None
+    session_id = create_session(scenario_id=scenario_id, title=title)
     return CreateSessionResponse(session_id=session_id)
 
 
 @router.post("/message", response_model=ChatMessageResponse)
-async def chat_message(req: ChatMessageRequest, current_user: str = Depends(get_current_user)):
+async def chat_message(
+    req: ChatMessageRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: str = Depends(get_current_user),
+):
     _ = current_user
     if not session_exists(req.session_id):
         raise HTTPException(status_code=404, detail="Unknown session_id. Call /chat/session first.")
 
+    # 1) lagre user message i session
     add_message(req.session_id, "user", req.message)
 
-    # Dummy reply for now. We'll replace this with a proper chatbot pipeline when frontend is wired.
-    assistant = f"Jeg hørte deg: {req.message}"
+    # 2) bygg meldingshistorikk til OpenAI
+    base_system_prompt = os.getenv("CHAT_SYSTEM_PROMPT", "Du er en hjelpsom assistent.")
+    transcript = get_messages(req.session_id)
 
+    messages = [{"role": "system", "content": base_system_prompt}]
+
+    # 2.1) hent scenario og legg inn scenario-system_prompt
+    scenario_id, _title = get_session_meta(req.session_id)
+    if scenario_id is not None:
+        result = await session.execute(select(Scenario).where(Scenario.id == scenario_id))
+        scenario = result.scalar_one_or_none()
+        if scenario and scenario.system_prompt:
+            messages.append({"role": "system", "content": scenario.system_prompt})
+
+            # (valgfritt, men ofte nyttig) ekstra kontekst til modellen:
+            messages.append({
+                "role": "system",
+                "content": (
+                    f"Scenario: {scenario.title}\n"
+                    f"Beskrivelse: {scenario.description or ''}\n"
+                    f"Vanskelighetsgrad: {scenario.difficulty or ''}\n"
+                    f"Kategori: {scenario.category or ''}\n"
+                ).strip(),
+            })
+
+    # 2.2) legg til historikk
+    messages.extend([{"role": m.role, "content": m.content} for m in transcript])
+
+    # 3) kall OpenAI
+    try:
+        assistant = await chat_complete_messages(messages=messages)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI-feil: {str(e)}")
+
+    # 4) lagre assistant reply
     add_message(req.session_id, "assistant", assistant)
 
     return ChatMessageResponse(
