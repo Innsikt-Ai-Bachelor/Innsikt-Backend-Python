@@ -16,8 +16,6 @@ from models.chat import (
     CreateSessionResponse,
     FinishRequest,
     FinishResponse,
-    CriterionScore,
-    Source,
 )
 from services.chat_session_store import (
     add_message,
@@ -26,6 +24,9 @@ from services.chat_session_store import (
     session_exists,
 )
 from services.openai_client import chat_complete_messages
+from services.feedback_pipeline import evaluate_conversation
+
+
 class CreateSessionRequest(BaseModel):
     scenario_id: Optional[int] = None
     title: Optional[str] = None
@@ -105,7 +106,11 @@ async def chat_message(
 
 
 @router.post("/finish", response_model=FinishResponse)
-async def finish_chat(req: FinishRequest, current_user: str = Depends(get_current_user)):
+async def finish_chat(
+    req: FinishRequest,
+    session: AsyncSession = Depends(get_session),
+    current_user: str = Depends(get_current_user),
+):
     _ = current_user
     if not session_exists(req.session_id):
         raise HTTPException(status_code=404, detail="Unknown session_id.")
@@ -114,22 +119,19 @@ async def finish_chat(req: FinishRequest, current_user: str = Depends(get_curren
     if not transcript:
         raise HTTPException(status_code=400, detail="Session has no messages.")
 
-    # Dummy scoring for now. Will be replaced by Eval-RAG.
-    criteria = [
-        CriterionScore(name="Faglig korrekthet", score=3, max_score=5, reason="Dummy – ikke evaluert enda."),
-        CriterionScore(name="Sikkerhet", score=3, max_score=5, reason="Dummy – ikke evaluert enda."),
-        CriterionScore(name="Kommunikasjon", score=4, max_score=5, reason="Dummy – ikke evaluert enda."),
-    ]
-    total = round(sum(c.score / c.max_score for c in criteria) / len(criteria) * 100)
-    feedback = [
-        "Dummy feedback: Dette er en placeholder til Eval-RAG er koblet på.",
-        "Når vi kobler på, kommer konkrete forbedringspunkter basert på kundedokumentene.",
-    ]
+    # Hent scenario hvis sessjonen er knyttet til ett
+    scenario_id, _title = get_session_meta(req.session_id)
+    scenario = None
+    if scenario_id is not None:
+        result = await session.execute(select(Scenario).where(Scenario.id == scenario_id))
+        scenario = result.scalar_one_or_none()
 
-    return FinishResponse(
-        session_id=req.session_id,
-        total_score=total,
-        criteria=criteria,
-        feedback=feedback,
-        sources=[Source(source="dummy")],
-    )
+    try:
+        return await evaluate_conversation(
+            session=session,
+            session_id=req.session_id,
+            messages=transcript,
+            scenario=scenario,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Evalueringsfeil: {str(e)}")

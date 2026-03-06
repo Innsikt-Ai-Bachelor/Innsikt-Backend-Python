@@ -1,6 +1,6 @@
+import json
 import os
-from typing import List
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from openai import AsyncOpenAI
 
@@ -18,7 +18,7 @@ def get_embedding_model() -> str:
 
 
 def get_chat_model() -> str:
-    return os.getenv("CHAT_MODEL", "gpt-4.1-mini")
+    return os.getenv("CHAT_MODEL", "gpt-5-nano")
 
 
 async def embed_texts(texts: List[str]) -> List[List[float]]:
@@ -38,7 +38,6 @@ async def chat_complete(system: str, user: str) -> str:
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
-        temperature=0.2,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -60,3 +59,18 @@ async def chat_complete_messages(
         messages=messages,
     )
     return resp.choices[0].message.content or ""
+
+
+async def chat_complete_json(system: str, user: str) -> dict:
+    """Kaller OpenAI med JSON mode – returnerer alltid et dict."""
+    client = _client()
+    model = get_chat_model()
+    resp = await client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    )
+    return json.loads(resp.choices[0].message.content or "{}")
