@@ -76,4 +76,13 @@ async def chat_complete_json(system: str, user: str) -> dict:
             {"role": "user", "content": user},
         ],
     )
-    return json.loads(resp.choices[0].message.content or "{}")
+    content = resp.choices[0].message.content
+
+    if content is None or not str(content).strip():
+        raise ValueError("Expected JSON content from chat completion, but received empty content.")
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        # Include the original message for easier debugging while preserving the traceback.
+        raise ValueError(f"Failed to decode JSON from chat completion: {exc.msg}") from exc
