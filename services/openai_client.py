@@ -36,11 +36,12 @@ async def embed_query(text: str) -> List[float]:
     return (await embed_texts([text]))[0]
 
 
-async def chat_complete(system: str, user: str) -> str:
+async def chat_complete(system: str, user: str, temperature: float = 0.4) -> str:
     client = _client()
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
+        temperature=temperature,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -59,6 +60,7 @@ async def chat_complete_messages(
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
+        temperature=temperature,
         messages=messages,
     )
     return resp.choices[0].message.content or ""
