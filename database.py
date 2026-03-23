@@ -36,5 +36,6 @@ async def init_db() -> None:
     import models.db
     import models.rag
     import models.scenario
+    import models.history
     async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
