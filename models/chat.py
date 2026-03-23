@@ -44,7 +44,12 @@ class FinishResponse(BaseModel):
     session_id: str
     total_score: int
     criteria: List[CriterionScore]
-    feedback: List[str]
+    positive_feedback: List[str] = Field(default_factory=list)
+    negative_feedback: List[str] = Field(default_factory=list)
+    feedback: List[str] = Field(
+        default_factory=list,
+        description="Deprecated; use positive_feedback and negative_feedback instead.",
+    )
     sources: List[Source] = Field(default_factory=list)
 
 

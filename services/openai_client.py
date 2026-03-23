@@ -1,6 +1,6 @@
+import json
 import os
 from typing import List
-from typing import Any, Dict
 
 from openai import AsyncOpenAI
 
@@ -18,7 +18,10 @@ def get_embedding_model() -> str:
 
 
 def get_chat_model() -> str:
-    return os.getenv("CHAT_MODEL", "gpt-4.1-mini")
+    chat_model = os.getenv("CHAT_MODEL")
+    if not chat_model:
+        raise RuntimeError("CHAT_MODEL is not set")
+    return chat_model
 
 
 async def embed_texts(texts: List[str]) -> List[List[float]]:
@@ -33,12 +36,12 @@ async def embed_query(text: str) -> List[float]:
     return (await embed_texts([text]))[0]
 
 
-async def chat_complete(system: str, user: str) -> str:
+async def chat_complete(system: str, user: str, temperature: float = 0.4) -> str:
     client = _client()
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
-        temperature=0.2,
+        temperature=temperature,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -57,6 +60,31 @@ async def chat_complete_messages(
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
+        temperature=temperature,
         messages=messages,
     )
     return resp.choices[0].message.content or ""
+
+
+async def chat_complete_json(system: str, user: str) -> dict:
+    """Kaller OpenAI med JSON mode – returnerer alltid et dict."""
+    client = _client()
+    model = get_chat_model()
+    resp = await client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+    )
+    content = resp.choices[0].message.content
+
+    if content is None or not str(content).strip():
+        raise ValueError("Expected JSON content from chat completion, but received empty content.")
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        # Include the original message for easier debugging while preserving the traceback.
+        raise ValueError(f"Failed to decode JSON from chat completion: {exc.msg}") from exc
