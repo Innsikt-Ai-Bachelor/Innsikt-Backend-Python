@@ -18,7 +18,10 @@ def get_embedding_model() -> str:
 
 
 def get_chat_model() -> str:
-    return os.getenv("CHAT_MODEL", "gpt-5-nano")
+    chat_model = os.getenv("CHAT_MODEL")
+    if not chat_model:
+        raise RuntimeError("CHAT_MODEL is not set")
+    return chat_model
 
 
 async def embed_texts(texts: List[str]) -> List[List[float]]:
