@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,8 @@ from services.openai_client import chat_complete_json, embed_query
 from services.rag_store import search_similar
 
 logger = logging.getLogger(__name__)
+
+FEEDBACK_RAG_DOC_ID = os.getenv("FEEDBACK_RAG_DOC_ID", "samtalemetodikk_foreldre_rag.pdf")
 
 EVAL_SYSTEM_PROMPT = """Du er en ekspert-evaluator for treningssamtaler.
 
@@ -158,7 +161,12 @@ async def evaluate_conversation(
     if search_query.strip():
         try:
             q_emb = await embed_query(search_query)
-            rows = await search_similar(session=session, query_embedding=q_emb, k=5)
+            rows = await search_similar(
+                session=session,
+                query_embedding=q_emb,
+                k=5,
+                doc_id=FEEDBACK_RAG_DOC_ID,
+            )
         except Exception:
             logger.warning("pgvector-søk feilet, fortsetter uten dokumentkontekst.", exc_info=True)
 

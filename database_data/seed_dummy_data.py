@@ -1,9 +1,12 @@
 import asyncio
 import os
 import sys
+from io import BytesIO
 from pathlib import Path
 
-from sqlalchemy import select
+from dotenv import load_dotenv
+from pypdf import PdfReader
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
@@ -16,14 +19,30 @@ import models.db  # noqa: E402,F401
 import models.rag  # noqa: E402,F401
 import models.scenario  # noqa: E402,F401
 from models.db import User  # noqa: E402
+from models.rag import RagChunk  # noqa: E402
 from models.scenario import Scenario  # noqa: E402
 from models.users import hash_password  # noqa: E402
+from services.rag_pipeline import ingest_documents  # noqa: E402
+
+
+RAG_DOC_FILENAME = "samtalemetodikk_foreldre_rag.pdf"
+
+
+def _extract_pdf_text(pdf_path: Path) -> str:
+    raw = pdf_path.read_bytes()
+    reader = PdfReader(BytesIO(raw))
+    text = "\n".join((page.extract_text() or "") for page in reader.pages).strip()
+    if not text:
+        raise RuntimeError(f"No extractable text found in PDF: {pdf_path.name}")
+    return text
 
 
 async def seed_dummy_data() -> None:
+    load_dotenv(PROJECT_ROOT / ".env")
+
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
-        raise RuntimeError("DATABASE_URL is not set")
+        raise RuntimeError("DATABASE_URL is not set (expected in environment or .env)")
 
     engine = create_async_engine(database_url, echo=False, pool_pre_ping=True)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -105,6 +124,32 @@ async def seed_dummy_data() -> None:
 
             await session.commit()
             print(f"Dummy user data inserted: {added_users} user(s).")
+
+            pdf_path = Path(__file__).resolve().parent / RAG_DOC_FILENAME
+            if not pdf_path.exists():
+                raise RuntimeError(f"Missing required RAG PDF: {pdf_path}")
+
+            pdf_text = _extract_pdf_text(pdf_path)
+
+            # Keep seeding idempotent by replacing existing chunks for this doc_id.
+            await session.execute(delete(RagChunk).where(RagChunk.doc_id == RAG_DOC_FILENAME))
+            await session.commit()
+
+            chunks_added = await ingest_documents(
+                session=session,
+                items=[
+                    (
+                        RAG_DOC_FILENAME,
+                        pdf_text,
+                        {
+                            "filename": RAG_DOC_FILENAME,
+                            "source": RAG_DOC_FILENAME,
+                            "seeded_by": "seed_dummy_data.py",
+                        },
+                    )
+                ],
+            )
+            print(f"RAG PDF ingested: {RAG_DOC_FILENAME} ({chunks_added} chunk(s)).")
     finally:
         await engine.dispose()
 

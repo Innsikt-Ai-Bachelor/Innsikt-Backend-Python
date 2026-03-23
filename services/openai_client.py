@@ -18,10 +18,13 @@ def get_embedding_model() -> str:
 
 
 def get_chat_model() -> str:
-    chat_model = os.getenv("CHAT_MODEL")
-    if not chat_model:
-        raise RuntimeError("CHAT_MODEL is not set")
-    return chat_model
+    # Priority order allows compatibility with different env naming conventions.
+    return (
+        os.getenv("CHAT_MODEL")
+        or os.getenv("OPENAI_CHAT_MODEL")
+        or os.getenv("OPENAI_MODEL")
+        or "gpt-4o-mini"
+    )
 
 
 async def embed_texts(texts: List[str]) -> List[List[float]]:
