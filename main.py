@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from dotenv import load_dotenv
 import uvicorn
@@ -25,4 +27,5 @@ def read_root():
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    reload = os.getenv("UVICORN_RELOAD", "false").lower() == "true"
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=reload)

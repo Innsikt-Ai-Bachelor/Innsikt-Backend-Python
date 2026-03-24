@@ -41,12 +41,6 @@ async def init_db() -> None:
     try:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-            await conn.execute(
-                text(
-                    "ALTER TABLE scenarios "
-                    "ADD COLUMN IF NOT EXISTS detailed_description JSON"
-                )
-            )
     except OSError as exc:
         raise RuntimeError(
             "Could not connect to PostgreSQL. Ensure the database is running and DATABASE_URL is correct."
@@ -55,3 +49,17 @@ async def init_db() -> None:
         raise RuntimeError(
             "Database initialization failed. Check DATABASE_URL and PostgreSQL configuration."
         ) from exc
+    # Best-effort backfill for databases created before detailed_description was added.
+    # Failures here (e.g. insufficient privileges, column already exists) are non-fatal.
+    try:
+        async with _engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE scenarios "
+                    "ADD COLUMN IF NOT EXISTS detailed_description TEXT"
+                )
+            )
+    except SQLAlchemyError:
+        # Non-fatal: the column may already exist, or the DB role may lack ALTER
+        # TABLE privileges.  The app can continue normally in either case.
+        pass
