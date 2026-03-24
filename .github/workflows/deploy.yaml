@@ -1,5 +1,5 @@
 name: Deploy to EC2
-# test for yaml
+
 on:
   push:
     branches:
