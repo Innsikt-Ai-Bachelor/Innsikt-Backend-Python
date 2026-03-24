@@ -13,6 +13,7 @@ from models.scenario import Scenario
 class ScenarioCreate(BaseModel):
 	title: str
 	description: str | None = None
+	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
 	system_prompt: str
@@ -22,6 +23,7 @@ class ScenarioCreate(BaseModel):
 class ScenarioUpdate(BaseModel):
 	title: str | None = None
 	description: str | None = None
+	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
 	system_prompt: str | None = None
@@ -32,12 +34,28 @@ class ScenarioPublic(BaseModel):
 	id: int
 	title: str
 	description: str | None = None
+	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
 	system_prompt: str
 	is_active: bool
 	created_at: datetime
 	updated_at: datetime | None = None
+
+
+def _normalize_detailed_description(value: object) -> str | None:
+	if value is None:
+		return None
+	if isinstance(value, str):
+		# Treat empty/blank strings as absent.
+		return value if value.strip() else None
+	# Legacy: column was previously JSON; extract a usable string if possible.
+	if isinstance(value, dict):
+		summary = value.get("summary")
+		if isinstance(summary, str) and summary.strip():
+			return summary
+		return None
+	return None
 
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])
@@ -48,6 +66,7 @@ def _to_public(scenario: Scenario) -> ScenarioPublic:
 		id=scenario.id,
 		title=scenario.title,
 		description=scenario.description,
+		detailed_description=_normalize_detailed_description(scenario.detailed_description),
 		difficulty=scenario.difficulty,
 		category=scenario.category,
 		system_prompt=scenario.system_prompt,
@@ -78,6 +97,7 @@ async def create_scenario(
 	scenario = Scenario(
 		title=scenario_in.title,
 		description=scenario_in.description,
+		detailed_description=scenario_in.detailed_description,
 		difficulty=scenario_in.difficulty,
 		category=scenario_in.category,
 		system_prompt=scenario_in.system_prompt,
@@ -106,6 +126,8 @@ async def update_scenario(
 		scenario.title = scenario_in.title
 	if scenario_in.description is not None:
 		scenario.description = scenario_in.description
+	if scenario_in.detailed_description is not None:
+		scenario.detailed_description = scenario_in.detailed_description
 	if scenario_in.difficulty is not None:
 		scenario.difficulty = scenario_in.difficulty
 	if scenario_in.category is not None:
