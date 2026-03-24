@@ -47,13 +47,15 @@ def _normalize_detailed_description(value: object) -> str | None:
 	if value is None:
 		return None
 	if isinstance(value, str):
-		return value
+		# Treat empty/blank strings as absent.
+		return value if value.strip() else None
+	# Legacy: column was previously JSON; extract a usable string if possible.
 	if isinstance(value, dict):
 		summary = value.get("summary")
 		if isinstance(summary, str) and summary.strip():
 			return summary
 		return None
-	return str(value)
+	return None
 
 
 router = APIRouter(prefix="/scenarios", tags=["scenarios"])

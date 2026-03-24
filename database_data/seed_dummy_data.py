@@ -6,7 +6,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from pypdf import PdfReader
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 
@@ -50,20 +51,31 @@ async def seed_dummy_data() -> None:
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+            # Best-effort backfill for pre-existing databases that predate this column.
+            try:
+                await conn.execute(
+                    text(
+                        "ALTER TABLE scenarios "
+                        "ADD COLUMN IF NOT EXISTS detailed_description TEXT"
+                    )
+                )
+            except SQLAlchemyError:
+                # Non-fatal: the column may already exist, or the DB role may
+                # lack ALTER TABLE privileges.  Seeding can proceed either way.
+                pass
 
         async with session_factory() as session:
             scenarios = [
                 {
                     "title": "Uenighet om leggetid",
                     "description": "Forelder og barn er uenige om leggetid på hverdager.",
-                    "detailed_description":
-                    """
+                    "detailed_description": """
 Jonas på 8 år hadde en fin dag på skolen i dag.
 Han kom hjem i godt humør, spiste middag uten problemer og satte seg etterpå i sofaen med en tegneserie han har fulgt med på en stund.
 De siste dagene har leggetiden gått greit uten særlig motstand, men i dag virker han litt mer oppspilt enn vanlig.
 Han lo høyt av tegneserien flere ganger og har vært i sitt eget lille boble siden middag.
 Klokken nærmer seg 20:30 og du kjenner at det snart er på tide å si ifra.
-                    """,
+                    """.strip(),
                     "difficulty": "easy",
                     "category": "leggetid",
                     "system_prompt": (
@@ -113,15 +125,14 @@ SVAR ALLTID på norsk. Hold deg i rollen hele tiden, uansett hva forelderen sier
                 {
                     "title": "Konflikt om lekser",
                     "description": "Samtale med ungdom som unngår lekser og blir defensiv.",
-                    "detailed_description":
-                    """
+                    "detailed_description": """
 Du fikk en melding fra Mias kontaktlærer tidligere i dag.
 Hun skriver at Mia ikke har levert lekser en eneste gang denne uken, og at det ikke er første gangen det skjer.
 Det er torsdag. Mia på 12 år er hjemme og sitter i sofaen med mobilen.
 Hun har ikke nevnt noe om lekser, og lekseboken ligger fortsatt i sekken der den alltid har ligget siden mandag.
 Du vet at hun egentlig er flink på skolen, og at dette ikke er typisk for henne.
 Noe har skjedd, men du vet ikke hva.
-                    """,
+                    """.strip(),
                     "difficulty": "medium",
                     "category": "skole",
                     "system_prompt": (
@@ -174,15 +185,14 @@ SVAR ALLTID på norsk. Hold deg i rollen hele samtalen, uansett hva forelderen s
                 {
                     "title": "Morgensituasjon med tidspress",
                     "description": "Familien kommer for sent, og stemningen blir stresset.",
-                    "detailed_description": 
-                    """
+                    "detailed_description": """
 Det er 07:45 og dere skulle vært ute av døren for fem minutter siden.
 Emil på 11 år la seg litt sent i går og var treg da du vekket ham.
 Du har allerede minnet ham på tiden to ganger, men han sitter fortsatt ved kjøkkenbordet i pyjamasen og stirrer ned i en frokostbolle han knapt har rørt.
 Sekken er ikke pakket, og jakken hans ligger fortsatt på gulvet i gangen.
 Han svarer ikke når du snakker til ham, ikke fordi han er frekk, men han virker bare helt et annet sted.
 Bussen går om åtte minutter.
-                    """,
+                    """.strip(),
                     "difficulty": "hard",
                     "category": "rutiner",
                     "system_prompt": (
