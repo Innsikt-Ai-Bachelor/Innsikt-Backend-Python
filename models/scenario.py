@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, func
+from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text, func
 from database import Base
 
 class Scenario(Base):
@@ -7,6 +7,7 @@ class Scenario(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
+    detailed_description = Column(JSON, nullable=True)
     difficulty = Column(String(20), nullable=True)
 
     # brukes for filtering i appen (f.eks "konflikt", "skole", "skjermtid")
