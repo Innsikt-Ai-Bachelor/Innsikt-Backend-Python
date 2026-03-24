@@ -31,11 +31,12 @@ async def get_session():
 
 
 async def init_db() -> None:
+    import models.db
+    import models.history
+    import models.rag
+    import models.scenario
     if _engine is None:
         _init_engine()
-        import models.db
-        import models.rag
-        import models.scenario
     try:
         async with _engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

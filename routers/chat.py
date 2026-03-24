@@ -148,14 +148,32 @@ async def finish_chat(
     current_user: str = Depends(get_current_user),
 ):
     _ = current_user
-    if not session_exists(req.session_id):
-        raise HTTPException(status_code=404, detail="Unknown session_id.")
+    scenario_id: Optional[int] = None
 
-    transcript = get_messages(req.session_id)
+    if session_exists(req.session_id):
+        transcript = get_messages(req.session_id)
+        scenario_id, _title = get_session_meta(req.session_id)
+    else:
+        # Session not in memory (e.g. after a restart) — fall back to DB
+        db_sess_result = await db.execute(
+            select(ChatSessionDB).where(ChatSessionDB.id == req.session_id)
+        )
+        db_sess = db_sess_result.scalar_one_or_none()
+        if not db_sess:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        scenario_id = db_sess.scenario_id
+
+        msgs_result = await db.execute(
+            select(ChatMessageDB)
+            .where(ChatMessageDB.session_id == req.session_id)
+            .order_by(ChatMessageDB.id)
+        )
+        db_messages = msgs_result.scalars().all()
+        transcript = [StoredMessage(role=m.role, content=m.content) for m in db_messages]
+
     if not transcript:
         raise HTTPException(status_code=400, detail="Session has no messages.")
 
-    scenario_id, _title = get_session_meta(req.session_id)
     scenario = None
     if scenario_id is not None:
         result = await db.execute(select(Scenario).where(Scenario.id == scenario_id))
@@ -171,15 +189,26 @@ async def finish_chat(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Evalueringsfeil: {str(e)}")
 
-    # Lagre feedback i databasen
-    db.add(FeedbackRecord(
-        session_id=req.session_id,
-        total_score=feedback.total_score,
-        criteria=[c.model_dump() for c in feedback.criteria],
-        positive_feedback=feedback.positive_feedback,
-        negative_feedback=feedback.negative_feedback,
-        sources=[s.model_dump() for s in feedback.sources],
-    ))
+    # Upsert feedback — avoid integrity error if /finish is called more than once
+    fb_result = await db.execute(
+        select(FeedbackRecord).where(FeedbackRecord.session_id == req.session_id)
+    )
+    existing_fb = fb_result.scalar_one_or_none()
+    if existing_fb:
+        existing_fb.total_score = feedback.total_score
+        existing_fb.criteria = [c.model_dump() for c in feedback.criteria]
+        existing_fb.positive_feedback = feedback.positive_feedback
+        existing_fb.negative_feedback = feedback.negative_feedback
+        existing_fb.sources = [s.model_dump() for s in feedback.sources]
+    else:
+        db.add(FeedbackRecord(
+            session_id=req.session_id,
+            total_score=feedback.total_score,
+            criteria=[c.model_dump() for c in feedback.criteria],
+            positive_feedback=feedback.positive_feedback,
+            negative_feedback=feedback.negative_feedback,
+            sources=[s.model_dump() for s in feedback.sources],
+        ))
     await db.commit()
 
     return feedback
