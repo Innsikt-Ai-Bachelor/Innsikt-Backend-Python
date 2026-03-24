@@ -63,3 +63,14 @@ def get_current_user(token_payload: dict = Depends(verify_token)) -> str:
         )
     return username
 
+
+def get_current_user_id(token_payload: dict = Depends(verify_token)) -> int:
+    """Extract user_id from verified token"""
+    user_id: int | None = token_payload.get("uid")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload",
+        )
+    return user_id
+
