@@ -13,6 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from database import Base  # noqa: E402
 import models.db  # noqa: E402,F401
+import models.history  # noqa: E402,F401
 import models.rag  # noqa: E402,F401
 import models.scenario  # noqa: E402,F401
 

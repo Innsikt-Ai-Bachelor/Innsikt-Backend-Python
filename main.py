@@ -3,7 +3,7 @@ import os
 from fastapi import FastAPI
 from dotenv import load_dotenv
 import uvicorn
-from routers import users, chat, rag, scenarios  
+from routers import users, chat, rag, scenarios, tts
 from database import init_db
 
 load_dotenv()
@@ -13,7 +13,8 @@ app = FastAPI()
 app.include_router(users.router)
 app.include_router(chat.router)
 app.include_router(rag.router)
-app.include_router(scenarios.router)  
+app.include_router(scenarios.router)
+app.include_router(tts.router)
 
 
 @app.on_event("startup")
