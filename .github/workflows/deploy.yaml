@@ -20,7 +20,4 @@ jobs:
             git pull
             source venv/bin/activate
             pip install -r requirements.txt
-            pkill uvicorn || true
-            nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-            disown
-          
+            sudo systemctl restart fastapi
