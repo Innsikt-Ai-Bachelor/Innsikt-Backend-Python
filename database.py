@@ -2,6 +2,7 @@ import os
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.exc import SQLAlchemyError
 
 
 class Base(DeclarativeBase):
@@ -36,5 +37,14 @@ async def init_db() -> None:
     import models.db
     import models.rag
     import models.scenario
-    async with _engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with _engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except OSError as exc:
+        raise RuntimeError(
+            "Could not connect to PostgreSQL. Ensure the database is running and DATABASE_URL is correct."
+        ) from exc
+    except SQLAlchemyError as exc:
+        raise RuntimeError(
+            "Database initialization failed. Check DATABASE_URL and PostgreSQL configuration."
+        ) from exc
