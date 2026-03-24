@@ -199,13 +199,13 @@ async def list_sessions(
     rows = result.all()
     return [
         SessionSummary(
-            session_id=row.ChatSessionDB.id,
-            scenario_id=row.ChatSessionDB.scenario_id,
-            title=row.ChatSessionDB.title,
-            created_at=row.ChatSessionDB.created_at,
-            total_score=row.total_score,
+            session_id=chat_session.id,
+            scenario_id=chat_session.scenario_id,
+            title=chat_session.title,
+            created_at=chat_session.created_at,
+            total_score=total_score,
         )
-        for row in rows
+        for chat_session, total_score in rows
     ]
 
 
