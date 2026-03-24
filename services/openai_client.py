@@ -42,30 +42,32 @@ async def embed_query(text: str) -> List[float]:
 async def chat_complete(system: str, user: str, temperature: float = 0.4) -> str:
     client = _client()
     model = get_chat_model()
-    resp = await client.chat.completions.create(
-        model=model,
-        temperature=temperature,
-        messages=[
+    
+    kwargs = {
+        "model": model,
+        "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
-        ],
-    )
+        ]
+    }
+    if not model.startswith(("o1", "o3", "o4", "gpt-5")):
+        kwargs["temperature"] = temperature
+    
+    resp = await client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content or ""
 
 async def chat_complete_messages(
     messages: list[dict[str, str]],
     temperature: float = 0.4,
 ) -> str:
-    """
-    messages: [{"role": "system|user|assistant", "content": "..."}]
-    """
     client = _client()
     model = get_chat_model()
-    resp = await client.chat.completions.create(
-        model=model,
-        temperature=temperature,
-        messages=messages,
-    )
+    
+    kwargs = {"model": model, "messages": messages}
+    if not model.startswith(("o1", "o3", "o4", "gpt-5")):
+        kwargs["temperature"] = temperature
+    
+    resp = await client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content or ""
 
 
