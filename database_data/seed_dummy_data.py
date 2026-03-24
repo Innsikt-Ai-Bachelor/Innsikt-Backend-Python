@@ -59,6 +59,36 @@ async def seed_dummy_data() -> None:
                         "ADD COLUMN IF NOT EXISTS detailed_description TEXT"
                     )
                 )
+
+                column_type_result = await conn.execute(
+                    text(
+                        "SELECT udt_name "
+                        "FROM information_schema.columns "
+                        "WHERE table_schema = current_schema() "
+                        "AND table_name = 'scenarios' "
+                        "AND column_name = 'detailed_description'"
+                    )
+                )
+                column_type = column_type_result.scalar_one_or_none()
+
+                # Legacy installs may still have JSON/JSONB for this column; coerce to
+                # TEXT so ORM inserts/updates continue to work with string payloads.
+                if column_type in {"json", "jsonb"}:
+                    await conn.execute(
+                        text(
+                            "ALTER TABLE scenarios "
+                            "ALTER COLUMN detailed_description TYPE TEXT "
+                            "USING CASE "
+                            "WHEN detailed_description IS NULL THEN NULL "
+                            "WHEN jsonb_typeof(detailed_description::jsonb) = 'object' "
+                            "AND (detailed_description::jsonb ? 'summary') "
+                            "THEN detailed_description::jsonb ->> 'summary' "
+                            "WHEN jsonb_typeof(detailed_description::jsonb) = 'string' "
+                            "THEN detailed_description::jsonb #>> '{}' "
+                            "ELSE detailed_description::text "
+                            "END"
+                        )
+                    )
             except SQLAlchemyError:
                 # Non-fatal: the column may already exist, or the DB role may
                 # lack ALTER TABLE privileges.  Seeding can proceed either way.
@@ -282,6 +312,8 @@ SVAR ALLTID på norsk. Hold deg i rollen hele samtalen, selv om forelderen gjør
             print(
                 f"Scenarios upserted: {created_scenarios} created, {updated_scenarios} updated."
             )
+
+            await session.commit()
 
             dummy_users = [
                 {
