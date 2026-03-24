@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +12,8 @@ from services.openai_client import chat_complete_json, embed_query
 from services.rag_store import search_similar
 
 logger = logging.getLogger(__name__)
+
+FEEDBACK_RAG_DOC_ID = os.getenv("FEEDBACK_RAG_DOC_ID", "samtalemetodikk_foreldre_rag.pdf")
 
 EVAL_SYSTEM_PROMPT = """Du er en ekspert-evaluator for treningssamtaler.
 
@@ -71,20 +74,65 @@ def _format_context(rows: list[Any]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
+def _safe_int(value: Any, default: int) -> int:
+    """
+    Safely convert a value to int, returning a default on failure.
+
+    This protects against malformed model output (e.g. "5/10", null).
+    """
+    try:
+        if value is None:
+            raise ValueError("None is not a valid integer")
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning(
+            "Invalid integer value '%s' in evaluation response; using default %s",
+            value,
+            default,
+        )
+        return default
+
+
 def _parse_response(data: dict, session_id: str, sources: list[Source]) -> FinishResponse:
     raw_criteria = data.get("criteria", [])
-    criteria = [
-        CriterionScore(
-            name=c.get("name", "Ukjent"),
-            score=int(c.get("score", 0)),
-            max_score=int(c.get("max_score", 10)),
-            reason=c.get("reason", ""),
+    criteria: list[CriterionScore] = []
+
+    for c in raw_criteria:
+        score = _safe_int(c.get("score"), 0)
+        max_score = _safe_int(c.get("max_score"), 10)
+        if max_score <= 0:
+            logger.warning(
+                "Non-positive max_score '%s' in evaluation response; using default 10",
+                max_score,
+            )
+            max_score = 10
+
+        criteria.append(
+            CriterionScore(
+                name=c.get("name", "Ukjent"),
+                score=score,
+                max_score=max_score,
+                reason=c.get("reason", ""),
+            )
         )
-        for c in raw_criteria
-    ]
 
     if criteria:
-        total_score = round(sum(c.score / c.max_score for c in criteria) / len(criteria) * 100)
+        normalized_scores: list[float] = []
+        for c in criteria:
+            if c.max_score > 0:
+                normalized_scores.append(c.score / c.max_score)
+            else:
+                logger.warning(
+                    "Encountered criterion with non-positive max_score=%s; skipping in total_score",
+                    c.max_score,
+                )
+
+        if normalized_scores:
+            total_score = round(
+                sum(normalized_scores) / len(normalized_scores) * 100
+            )
+        else:
+            total_score = 0
     else:
         total_score = 0
     total_score = max(0, min(100, total_score))
@@ -113,7 +161,12 @@ async def evaluate_conversation(
     if search_query.strip():
         try:
             q_emb = await embed_query(search_query)
-            rows = await search_similar(session=session, query_embedding=q_emb, k=5)
+            rows = await search_similar(
+                session=session,
+                query_embedding=q_emb,
+                k=5,
+                doc_id=FEEDBACK_RAG_DOC_ID,
+            )
         except Exception:
             logger.warning("pgvector-søk feilet, fortsetter uten dokumentkontekst.", exc_info=True)
 

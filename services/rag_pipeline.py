@@ -42,8 +42,11 @@ async def ingest_documents(
     chunk_size: int = 1200,
     chunk_overlap: int = 200,
 ) -> int:
-    """Ingest (doc_id, content, meta) items into pgvector store...
-    Returns number of chunks ingested."""
+    """Ingest (doc_id, content, meta) items into the pgvector store.
+
+    Returns:
+        int: Number of chunks ingested.
+    """
     total_chunks = 0
     for doc_id, content, meta in items:
         chunks = split_text(content, chunk_size=chunk_size, chunk_overlap=chunk_overlap)

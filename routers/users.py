@@ -89,4 +89,10 @@ async def login_user(credentials: LoginRequest, session: AsyncSession = Depends(
     if not verify_password(credentials.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     access_token = create_access_token(subject=user.username, user_id=user.id)
-    return LoginResponse(access_token=access_token, token_type="bearer")
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+    )

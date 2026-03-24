@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict, List
+from typing import List
 
 from openai import AsyncOpenAI
 
@@ -18,7 +18,13 @@ def get_embedding_model() -> str:
 
 
 def get_chat_model() -> str:
-    return os.getenv("CHAT_MODEL", "gpt-5-nano")
+    # Priority order allows compatibility with different env naming conventions.
+    return (
+        os.getenv("CHAT_MODEL")
+        or os.getenv("OPENAI_CHAT_MODEL")
+        or os.getenv("OPENAI_MODEL")
+        or "gpt-4o-mini"
+    )
 
 
 async def embed_texts(texts: List[str]) -> List[List[float]]:
@@ -33,11 +39,12 @@ async def embed_query(text: str) -> List[float]:
     return (await embed_texts([text]))[0]
 
 
-async def chat_complete(system: str, user: str) -> str:
+async def chat_complete(system: str, user: str, temperature: float = 0.4) -> str:
     client = _client()
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
+        temperature=temperature,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -56,6 +63,7 @@ async def chat_complete_messages(
     model = get_chat_model()
     resp = await client.chat.completions.create(
         model=model,
+        temperature=temperature,
         messages=messages,
     )
     return resp.choices[0].message.content or ""
@@ -73,4 +81,13 @@ async def chat_complete_json(system: str, user: str) -> dict:
             {"role": "user", "content": user},
         ],
     )
-    return json.loads(resp.choices[0].message.content or "{}")
+    content = resp.choices[0].message.content
+
+    if content is None or not str(content).strip():
+        raise ValueError("Expected JSON content from chat completion, but received empty content.")
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError as exc:
+        # Include the original message for easier debugging while preserving the traceback.
+        raise ValueError(f"Failed to decode JSON from chat completion: {exc.msg}") from exc

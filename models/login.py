@@ -9,3 +9,6 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str
+    username: str
+    email: str
+    full_name: str
