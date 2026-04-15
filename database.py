@@ -89,6 +89,13 @@ async def init_db() -> None:
                         "END"
                     )
                 )
+        async with _engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "ALTER TABLE scenarios "
+                    "ADD COLUMN IF NOT EXISTS emoji VARCHAR(10)"
+                )
+            )
     except SQLAlchemyError:
         # Non-fatal: the column may already exist, or the DB role may lack ALTER
         # TABLE privileges.  The app can continue normally in either case.

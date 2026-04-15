@@ -15,39 +15,52 @@ logger = logging.getLogger(__name__)
 
 FEEDBACK_RAG_DOC_ID = os.getenv("FEEDBACK_RAG_DOC_ID", "samtalemetodikk_foreldre_rag.pdf")
 
-EVAL_SYSTEM_PROMPT = """Du er en ekspert-evaluator for treningssamtaler.
+EVAL_SYSTEM_PROMPT = """Du er en ekspert-evaluator for treningssamtaler mellom foreldre og barn.
 
-Din oppgave er å evaluere en samtale mellom en bruker og en AI-rollekarakter, \
-og vurdere hvor godt brukeren håndterte situasjonen sammenlignet med faglig beste praksis.
-
-Du får:
-1. Fagdokumenter som beskriver korrekt fremgangsmåte (fasiten)
-2. Selve samtalen
-
-Bruk utelukkende fagdokumentene som grunnlag for evalueringen. \
-Trekk ut konkrete kriterier fra dokumentene og vurder samtalen mot dem.
+Din oppgave er å evaluere samtalen mot 4 faste kriterier. \
+Bruk fagdokumentene som kontekst og begrunnelsesgrunnlag, \
+men kriteriene er alltid de samme uansett samtaleinnhold.
 
 Returner ALLTID gyldig JSON i dette eksakte formatet (ingen annen tekst):
 {
   "total_score": <heltall 0-100>,
   "criteria": [
     {
-      "name": "<kriterie-navn fra fagdokumentet>",
-      "score": <heltall>,
-      "max_score": <heltall>,
-      "reason": "<konkret begrunnelse basert på samtalen og fagdokumentet>"
+      "name": "empati",
+      "score": <heltall 0-100>,
+      "max_score": 100,
+      "reason": "<i hvilken grad brukeren anerkjenner og validerer barnets følelser, med eksempel fra samtalen>"
+    },
+    {
+      "name": "tydelighet",
+      "score": <heltall 0-100>,
+      "max_score": 100,
+      "reason": "<i hvilken grad brukeren kommuniserer grenser og forventninger klart, med eksempel fra samtalen>"
+    },
+    {
+      "name": "ro",
+      "score": <heltall 0-100>,
+      "max_score": 100,
+      "reason": "<i hvilken grad brukeren holder seg rolig og unngår eskalering, med eksempel fra samtalen>"
+    },
+    {
+      "name": "løsningsorientering",
+      "score": <heltall 0-100>,
+      "max_score": 100,
+      "reason": "<i hvilken grad brukeren fokuserer på løsning fremfor konflikt, med eksempel fra samtalen>"
     }
   ],
-  "positive_feedback": ["<konkret ting brukeren gjorde bra>", "..."],
-  "negative_feedback": ["<konkret forbedringsområde>", "..."]
+  "positive_feedback": ["<konkret ting brukeren gjorde bra, henvis til faktisk melding>"],
+  "negative_feedback": ["<konkret forbedringsområde med alternativt forslag til formulering>"]
 }
 
-Krav:
-- Kriteriene skal komme direkte fra fagdokumentene, ikke fra generelle prinsipper
-- Gi minst 2 og maks 5 kriterier
-- Gi minst 1 positiv og minst 1 negativ tilbakemelding
-- total_score skal være summen av (score/max_score) for alle kriterier skalert til 0-100
-- Vær konkret og henvis til hva brukeren faktisk sa i samtalen
+Regler:
+- Kriteriene er alltid disse 4, i denne rekkefølgen — ikke legg til eller fjern noen
+- Selv om et kriterie ikke er relevant for scenarioet, sett score til 0 med en kort begrunnelse
+- Gi minst 1 og maks 3 elementer i positive_feedback og negative_feedback
+- Henvis alltid til noe brukeren faktisk skrev i samtalen
+- total_score beregnes som gjennomsnittet av de fire score-verdiene (0-100)
+- Fagdokumentene brukes kun som bakgrunnskunnskap for å begrunne vurderingene
 """
 
 

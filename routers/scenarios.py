@@ -16,6 +16,7 @@ class ScenarioCreate(BaseModel):
 	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
+	emoji: str | None = None
 	system_prompt: str
 	is_active: bool = True
 
@@ -26,6 +27,7 @@ class ScenarioUpdate(BaseModel):
 	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
+	emoji: str | None = None
 	system_prompt: str | None = None
 	is_active: bool | None = None
 
@@ -37,6 +39,7 @@ class ScenarioPublic(BaseModel):
 	detailed_description: str | None = None
 	difficulty: str | None = None
 	category: str | None = None
+	emoji: str | None = None
 	system_prompt: str
 	is_active: bool
 	created_at: datetime
@@ -69,6 +72,7 @@ def _to_public(scenario: Scenario) -> ScenarioPublic:
 		detailed_description=_normalize_detailed_description(scenario.detailed_description),
 		difficulty=scenario.difficulty,
 		category=scenario.category,
+		emoji=scenario.emoji,
 		system_prompt=scenario.system_prompt,
 		is_active=scenario.is_active,
 		created_at=scenario.created_at,
@@ -100,6 +104,7 @@ async def create_scenario(
 		detailed_description=scenario_in.detailed_description,
 		difficulty=scenario_in.difficulty,
 		category=scenario_in.category,
+		emoji=scenario_in.emoji,
 		system_prompt=scenario_in.system_prompt,
 		is_active=scenario_in.is_active,
 	)
@@ -132,6 +137,8 @@ async def update_scenario(
 		scenario.difficulty = scenario_in.difficulty
 	if scenario_in.category is not None:
 		scenario.category = scenario_in.category
+	if scenario_in.emoji is not None:
+		scenario.emoji = scenario_in.emoji
 	if scenario_in.system_prompt is not None:
 		scenario.system_prompt = scenario_in.system_prompt
 	if scenario_in.is_active is not None:
