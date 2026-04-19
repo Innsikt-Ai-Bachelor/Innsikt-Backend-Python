@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 import os
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_session
@@ -30,6 +30,7 @@ from services.chat_session_store import (
 )
 from services.openai_client import chat_complete_messages
 from services.feedback_pipeline import evaluate_conversation
+from services.gamification_service import award_xp_and_check_badges
 
 
 class CreateSessionRequest(BaseModel):
@@ -42,7 +43,19 @@ class SessionSummary(BaseModel):
     scenario_id: Optional[int]
     title: Optional[str]
     created_at: datetime
-    total_score: Optional[int] = None
+    # Always an integer; 0 means the session has not been evaluated yet.
+    total_score: int = 0
+    has_feedback: bool = False
+
+
+class FeedbackDetail(BaseModel):
+    """Lightweight feedback-only view — no message history."""
+    session_id: str
+    total_score: int
+    criteria: List[CriterionScore]
+    positive_feedback: List[str] = Field(default_factory=list)
+    negative_feedback: List[str] = Field(default_factory=list)
+    sources: List[Source] = Field(default_factory=list)
 
 
 class SessionDetail(BaseModel):
@@ -146,6 +159,7 @@ async def finish_chat(
     req: FinishRequest,
     db: AsyncSession = Depends(get_session),
     current_user: str = Depends(get_current_user),
+    current_user_id: int = Depends(get_current_user_id),
 ):
     _ = current_user
     scenario_id: Optional[int] = None
@@ -194,6 +208,7 @@ async def finish_chat(
         select(FeedbackRecord).where(FeedbackRecord.session_id == req.session_id)
     )
     existing_fb = fb_result.scalar_one_or_none()
+    is_new_feedback = existing_fb is None
     if existing_fb:
         existing_fb.total_score = feedback.total_score
         existing_fb.criteria = [c.model_dump() for c in feedback.criteria]
@@ -211,7 +226,16 @@ async def finish_chat(
         ))
     await db.commit()
 
-    return feedback
+    # Award XP / badges exactly once per unique session completion.
+    new_badges: list[str] = []
+    if is_new_feedback:
+        new_badges = await award_xp_and_check_badges(
+            db=db,
+            user_id=current_user_id,
+            total_score=feedback.total_score,
+        )
+
+    return feedback.model_copy(update={"newly_earned_badges": new_badges})
 
 
 @router.get("/sessions", response_model=List[SessionSummary])
@@ -220,7 +244,11 @@ async def list_sessions(
     current_user_id: int = Depends(get_current_user_id),
 ):
     result = await db.execute(
-        select(ChatSessionDB, FeedbackRecord.total_score)
+        select(
+            ChatSessionDB,
+            func.coalesce(FeedbackRecord.total_score, 0).label("total_score"),
+            (FeedbackRecord.session_id.isnot(None)).label("has_feedback"),
+        )
         .outerjoin(FeedbackRecord, ChatSessionDB.id == FeedbackRecord.session_id)
         .where(ChatSessionDB.user_id == current_user_id)
         .order_by(ChatSessionDB.created_at.desc())
@@ -233,8 +261,9 @@ async def list_sessions(
             title=chat_session.title,
             created_at=chat_session.created_at,
             total_score=total_score,
+            has_feedback=has_feedback,
         )
-        for chat_session, total_score in rows
+        for chat_session, total_score, has_feedback in rows
     ]
 
 
@@ -285,4 +314,38 @@ async def get_session_detail(
         created_at=chat_session.created_at,
         messages=messages,
         feedback=feedback,
+    )
+
+
+@router.get("/session/{session_id}/feedback", response_model=FeedbackDetail)
+async def get_session_feedback(
+    session_id: str,
+    db: AsyncSession = Depends(get_session),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """Return only the feedback/criteria for a session — no message history."""
+    # Verify ownership
+    owner_result = await db.execute(
+        select(ChatSessionDB.id).where(
+            ChatSessionDB.id == session_id,
+            ChatSessionDB.user_id == current_user_id,
+        )
+    )
+    if owner_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    fb_result = await db.execute(
+        select(FeedbackRecord).where(FeedbackRecord.session_id == session_id)
+    )
+    fb = fb_result.scalar_one_or_none()
+    if fb is None:
+        raise HTTPException(status_code=404, detail="No feedback found for this session.")
+
+    return FeedbackDetail(
+        session_id=session_id,
+        total_score=fb.total_score,
+        criteria=[CriterionScore(**c) for c in fb.criteria],
+        positive_feedback=fb.positive_feedback,
+        negative_feedback=fb.negative_feedback,
+        sources=[Source(**s) for s in fb.sources],
     )

@@ -3,13 +3,31 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from auth import create_access_token, get_current_user
+from auth import create_access_token, get_current_user, get_current_user_id
 from database import get_session
 from models.db import User
 from models.login import LoginRequest, LoginResponse
 from models.users import UserCreate, UserPublic, UserUpdate, hash_password, verify_password
 
 router = APIRouter()
+
+@router.get("/users/me", response_model=UserPublic)
+async def get_current_user_profile(
+    session: AsyncSession = Depends(get_session),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    result = await session.execute(select(User).where(User.id == current_user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return UserPublic(
+        username=user.username,
+        email=user.email,
+        full_name=user.full_name,
+        xp=user.xp,
+        level=user.level,
+    )
+
 
 @router.get("/users/", response_model=list[UserPublic])
 async def read_users(
@@ -19,7 +37,7 @@ async def read_users(
     result = await session.execute(select(User))
     users = result.scalars().all()
     return [
-        UserPublic(username=user.username, email=user.email, full_name=user.full_name)
+        UserPublic(username=user.username, email=user.email, full_name=user.full_name, xp=user.xp, level=user.level)
         for user in users
     ]
 
@@ -42,7 +60,7 @@ async def register_user(user_in: UserCreate, session: AsyncSession = Depends(get
             detail="Username or email already exists",
         )
     await session.refresh(user)
-    return UserPublic(username=user.username, email=user.email, full_name=user.full_name)
+    return UserPublic(username=user.username, email=user.email, full_name=user.full_name, xp=user.xp, level=user.level)
 
 @router.put("/users/{username}", response_model=UserPublic)
 async def update_user(
@@ -77,7 +95,7 @@ async def update_user(
             detail="Email already exists",
         )
     await session.refresh(user)
-    return UserPublic(username=user.username, email=user.email, full_name=user.full_name)
+    return UserPublic(username=user.username, email=user.email, full_name=user.full_name, xp=user.xp, level=user.level)
 
 
 @router.post("/login", response_model=LoginResponse)

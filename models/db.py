@@ -1,4 +1,4 @@
-from sqlalchemy import String
+from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from database import Base
@@ -12,3 +12,5 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    xp: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    level: Mapped[int] = mapped_column(Integer, default=1, server_default="1")

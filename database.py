@@ -33,6 +33,7 @@ async def get_session():
 
 async def init_db() -> None:
     import models.db
+    import models.gamification
     import models.history
     import models.rag
     import models.scenario
@@ -51,6 +52,17 @@ async def init_db() -> None:
         ) from exc
     # Best-effort backfill for databases created before detailed_description was added.
     # Failures here (e.g. insufficient privileges, column already exists) are non-fatal.
+    try:
+        async with _engine.begin() as conn:
+            # Add gamification columns to the users table for existing deployments.
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INTEGER NOT NULL DEFAULT 0")
+            )
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INTEGER NOT NULL DEFAULT 1")
+            )
+    except SQLAlchemyError:
+        pass
     try:
         async with _engine.begin() as conn:
             await conn.execute(
