@@ -59,6 +59,12 @@ async def seed_dummy_data() -> None:
                         "ADD COLUMN IF NOT EXISTS detailed_description TEXT"
                     )
                 )
+                await conn.execute(
+                    text(
+                        "ALTER TABLE scenarios "
+                        "ADD COLUMN IF NOT EXISTS emoji VARCHAR(10)"
+                    )
+                )
 
                 column_type_result = await conn.execute(
                     text(
@@ -98,6 +104,7 @@ async def seed_dummy_data() -> None:
             scenarios = [
                 {
                     "title": "Uenighet om leggetid",
+                    "emoji": "🌙",
                     "description": "Forelder og barn er uenige om leggetid på hverdager.",
                     "detailed_description": """
 Jonas på 8 år hadde en fin dag på skolen i dag.
@@ -154,6 +161,7 @@ SVAR ALLTID på norsk. Hold deg i rollen hele tiden, uansett hva forelderen sier
                 },
                 {
                     "title": "Konflikt om lekser",
+                    "emoji": "📚",
                     "description": "Samtale med ungdom som unngår lekser og blir defensiv.",
                     "detailed_description": """
 Du fikk en melding fra Mias kontaktlærer tidligere i dag.
@@ -214,6 +222,7 @@ SVAR ALLTID på norsk. Hold deg i rollen hele samtalen, uansett hva forelderen s
                 },
                 {
                     "title": "Morgensituasjon med tidspress",
+                    "emoji": "🌅",
                     "description": "Familien kommer for sent, og stemningen blir stresset.",
                     "detailed_description": """
 Det er 07:45 og dere skulle vært ute av døren for fem minutter siden.
@@ -294,6 +303,7 @@ SVAR ALLTID på norsk. Hold deg i rollen hele samtalen, selv om forelderen gjør
                             detailed_description=scenario_data.get("detailed_description"),
                             difficulty=scenario_data["difficulty"],
                             category=scenario_data["category"],
+                            emoji=scenario_data.get("emoji"),
                             system_prompt=scenario_data["system_prompt"],
                             is_active=True,
                         )
@@ -305,6 +315,7 @@ SVAR ALLTID på norsk. Hold deg i rollen hele samtalen, selv om forelderen gjør
                 existing_scenario.detailed_description = scenario_data.get("detailed_description")
                 existing_scenario.difficulty = scenario_data["difficulty"]
                 existing_scenario.category = scenario_data["category"]
+                existing_scenario.emoji = scenario_data.get("emoji")
                 existing_scenario.system_prompt = scenario_data["system_prompt"]
                 existing_scenario.is_active = True
                 updated_scenarios += 1

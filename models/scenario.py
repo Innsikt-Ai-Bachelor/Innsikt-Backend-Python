@@ -13,6 +13,9 @@ class Scenario(Base):
     # brukes for filtering i appen (f.eks "konflikt", "skole", "skjermtid")
     category = Column(String(60), nullable=True)
 
+    # emoji som vises i scenario-listen på mobil
+    emoji = Column(String(10), nullable=True)
+
     # “prompt template” eller “system context” som AI-agenten skal bruke
     system_prompt = Column(Text, nullable=False)
 
