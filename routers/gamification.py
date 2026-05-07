@@ -3,14 +3,15 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from auth import get_current_user_id
 from database import get_session
+from models.db import User
 from models.gamification import UserBadge, UserQuest
 from models.history import ChatSessionDB, FeedbackRecord
-from services.gamification_service import BADGE_CATALOG, QUEST_CATALOG, get_week_start
+from services.gamification_service import BADGE_CATALOG, QUEST_CATALOG, get_week_start, compute_level
 
 router = APIRouter(prefix="/gamification", tags=["gamification"])
 
@@ -34,6 +35,119 @@ class MasteryItem(BaseModel):
     skill: str
     avg_score: float  # normalised 0.0–1.0
     session_count: int
+
+
+class ProgressResponse(BaseModel):
+    """Comprehensive progress/dashboard view with Norwegian labels."""
+    level: int
+    current_xp: int
+    xp_to_next_level: int
+    total_sessions: int
+    weekly_sessions: int
+    badges_earned: int
+    quests_completed_this_week: int
+    last_session_date: datetime | None
+
+
+# Norwegian UI labels for common progression elements
+PROGRESSION_LABELS = {
+    "level": "Nivå",
+    "xp_to_next_level": "XP til neste nivå",
+    "current_xp": "XP",
+    "current_streak": "Gjeldende streak",
+    "longest_streak": "Lengste streak",
+    "total_sessions": "Totalt økter",
+    "weekly_sessions": "Økter denne uken",
+    "active_quests": "Aktive oppdrag",
+    "average_score": "Gjennomsnittlig score",
+    "amazing_streak": "Fantastisk streak! 💪",
+}
+
+
+@router.get("/progress", response_model=ProgressResponse)
+async def get_progress(
+    db: AsyncSession = Depends(get_session),
+    current_user_id: int = Depends(get_current_user_id),
+):
+    """
+    Return comprehensive progress/dashboard view with all progression metrics
+    and Norwegian labels.
+    """
+    # Get user
+    user_result = await db.execute(select(User).where(User.id == current_user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        return ProgressResponse(
+            level=1,
+            current_xp=0,
+            xp_to_next_level=200,
+            total_sessions=0,
+            weekly_sessions=0,
+            badges_earned=0,
+            quests_completed_this_week=0,
+            last_session_date=None,
+        )
+
+    # Calculate XP to next level
+    next_level = user.level + 1
+    xp_for_current_level = (user.level - 1) * 200
+    xp_for_next_level = user.level * 200
+    xp_to_next_level = max(0, xp_for_next_level - user.xp)
+
+    # Count total sessions
+    total_sessions_result = await db.execute(
+        select(func.count(ChatSessionDB.id)).join(
+            FeedbackRecord, ChatSessionDB.id == FeedbackRecord.session_id
+        ).where(ChatSessionDB.user_id == current_user_id)
+    )
+    total_sessions = total_sessions_result.scalar_one() or 0
+
+    # Count weekly sessions
+    week_start = get_week_start()
+    weekly_sessions_result = await db.execute(
+        select(func.count(ChatSessionDB.id)).join(
+            FeedbackRecord, ChatSessionDB.id == FeedbackRecord.session_id
+        ).where(
+            ChatSessionDB.user_id == current_user_id,
+            ChatSessionDB.created_at >= week_start,
+        )
+    )
+    weekly_sessions = weekly_sessions_result.scalar_one() or 0
+
+    # Count badges earned
+    badges_result = await db.execute(
+        select(func.count(UserBadge.id)).where(UserBadge.user_id == current_user_id)
+    )
+    badges_earned = badges_result.scalar_one() or 0
+
+    # Count completed quests this week
+    quests_result = await db.execute(
+        select(func.count(UserQuest.id)).where(
+            UserQuest.user_id == current_user_id,
+            UserQuest.week_start == week_start,
+            UserQuest.completed == True,
+        )
+    )
+    quests_completed_this_week = quests_result.scalar_one() or 0
+
+    # Get last session date
+    last_session_result = await db.execute(
+        select(ChatSessionDB.created_at).where(
+            ChatSessionDB.user_id == current_user_id
+        ).order_by(ChatSessionDB.created_at.desc()).limit(1)
+    )
+    last_session_date = last_session_result.scalar_one_or_none()
+
+    return ProgressResponse(
+        level=user.level,
+        current_xp=user.xp,
+        xp_to_next_level=xp_to_next_level,
+        total_sessions=total_sessions,
+        weekly_sessions=weekly_sessions,
+        badges_earned=badges_earned,
+        quests_completed_this_week=quests_completed_this_week,
+        last_session_date=last_session_date,
+    )
 
 
 # ---------------------------------------------------------------------------

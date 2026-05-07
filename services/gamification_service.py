@@ -64,17 +64,31 @@ BADGE_CATALOG: list[dict[str, str]] = [
 QUEST_CATALOG: list[dict[str, Any]] = [
     {
         "id": "weekly_sessions",
-        "name": "Ukentlig trening",
+        "name": "Øv regelmessig",
         "description": "Fullfør 3 økter denne uken",
         "target": 3,
         "xp_reward": 50,
     },
     {
         "id": "weekly_high_score",
-        "name": "Ukentlig bragd",
+        "name": "Høy skår",
         "description": "Oppnå minst 70 poeng i en økt denne uken",
         "target": 1,
         "xp_reward": 30,
+    },
+    {
+        "id": "total_sessions",
+        "name": "Bygger vaner",
+        "description": "Fullfør 5 økter i alt",
+        "target": 5,
+        "xp_reward": 75,
+    },
+    {
+        "id": "weekly_goal",
+        "name": "Ukentlig mål",
+        "description": "Fullfør minst en økt denne uken",
+        "target": 1,
+        "xp_reward": 20,
     },
 ]
 
@@ -223,6 +237,18 @@ async def award_xp_and_check_badges(
         elif quest_id == "weekly_high_score":
             if total_score >= 70:
                 quest.current_count = 1
+                quest.completed = True
+                user.xp += quest_def["xp_reward"]
+
+        elif quest_id == "total_sessions":
+            quest.current_count = weekly_count
+            if quest.current_count >= quest_def["target"]:
+                quest.completed = True
+                user.xp += quest_def["xp_reward"]
+
+        elif quest_id == "weekly_goal":
+            quest.current_count = weekly_count
+            if quest.current_count >= quest_def["target"]:
                 quest.completed = True
                 user.xp += quest_def["xp_reward"]
 
