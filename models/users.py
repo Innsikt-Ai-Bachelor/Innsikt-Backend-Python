@@ -15,6 +15,8 @@ class UserPublic(BaseModel):
     username: str
     email: EmailStr
     full_name: str | None = None
+    xp: int = 0
+    level: int = 1
 
 
 class UserUpdate(BaseModel):

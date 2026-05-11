@@ -51,6 +51,10 @@ class FinishResponse(BaseModel):
         description="Deprecated; use positive_feedback and negative_feedback instead.",
     )
     sources: List[Source] = Field(default_factory=list)
+    newly_earned_badges: List[str] = Field(
+        default_factory=list,
+        description="Badge IDs unlocked by this session. Empty on re-submissions.",
+    )
 
 
 class StoredMessage(BaseModel):
