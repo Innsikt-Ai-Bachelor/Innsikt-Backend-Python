@@ -298,13 +298,15 @@ async def get_session_detail(
 
     feedback = None
     if fb:
+        criteria = fb.criteria or []
+        sources = fb.sources or []
         feedback = FinishResponse(
             session_id=session_id,
             total_score=fb.total_score,
-            criteria=[CriterionScore(**c) for c in fb.criteria],
-            positive_feedback=fb.positive_feedback,
-            negative_feedback=fb.negative_feedback,
-            sources=[Source(**s) for s in fb.sources],
+            criteria=[CriterionScore(**c) for c in criteria],
+            positive_feedback=fb.positive_feedback or [],
+            negative_feedback=fb.negative_feedback or [],
+            sources=[Source(**s) for s in sources],
         )
 
     return SessionDetail(
@@ -341,11 +343,13 @@ async def get_session_feedback(
     if fb is None:
         raise HTTPException(status_code=404, detail="No feedback found for this session.")
 
+    criteria = fb.criteria or []
+    sources = fb.sources or []
     return FeedbackDetail(
         session_id=session_id,
         total_score=fb.total_score,
-        criteria=[CriterionScore(**c) for c in fb.criteria],
-        positive_feedback=fb.positive_feedback,
-        negative_feedback=fb.negative_feedback,
-        sources=[Source(**s) for s in fb.sources],
+        criteria=[CriterionScore(**c) for c in criteria],
+        positive_feedback=fb.positive_feedback or [],
+        negative_feedback=fb.negative_feedback or [],
+        sources=[Source(**s) for s in sources],
     )

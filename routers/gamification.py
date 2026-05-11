@@ -11,7 +11,7 @@ from database import get_session
 from models.db import User
 from models.gamification import UserBadge, UserQuest
 from models.history import ChatSessionDB, FeedbackRecord
-from services.gamification_service import BADGE_CATALOG, QUEST_CATALOG, get_week_start, compute_level
+from services.gamification_service import QUEST_CATALOG, get_week_start
 
 router = APIRouter(prefix="/gamification", tags=["gamification"])
 
@@ -89,8 +89,6 @@ async def get_progress(
         )
 
     # Calculate XP to next level
-    next_level = user.level + 1
-    xp_for_current_level = (user.level - 1) * 200
     xp_for_next_level = user.level * 200
     xp_to_next_level = max(0, xp_for_next_level - user.xp)
 
@@ -125,7 +123,7 @@ async def get_progress(
         select(func.count(UserQuest.id)).where(
             UserQuest.user_id == current_user_id,
             UserQuest.week_start == week_start,
-            UserQuest.completed == True,
+            UserQuest.completed.is_(True),
         )
     )
     quests_completed_this_week = quests_result.scalar_one() or 0

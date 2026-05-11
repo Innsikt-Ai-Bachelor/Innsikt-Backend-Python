@@ -206,13 +206,16 @@ async def award_xp_and_check_badges(
     # --- 6. Update weekly quest progress ---
     for quest_def in QUEST_CATALOG:
         quest_id = quest_def["id"]
-        quest_result = await db.execute(
-            select(UserQuest).where(
-                UserQuest.user_id == user_id,
-                UserQuest.quest_id == quest_id,
-                UserQuest.week_start == week_start,
-            )
+        quest_query = select(UserQuest).where(
+            UserQuest.user_id == user_id,
+            UserQuest.quest_id == quest_id,
         )
+        if quest_id == "total_sessions":
+            quest_query = quest_query.order_by(UserQuest.week_start.asc()).limit(1)
+        else:
+            quest_query = quest_query.where(UserQuest.week_start == week_start)
+
+        quest_result = await db.execute(quest_query)
         quest = quest_result.scalar_one_or_none()
 
         if quest is None:
@@ -241,7 +244,7 @@ async def award_xp_and_check_badges(
                 user.xp += quest_def["xp_reward"]
 
         elif quest_id == "total_sessions":
-            quest.current_count = weekly_count
+            quest.current_count = session_count
             if quest.current_count >= quest_def["target"]:
                 quest.completed = True
                 user.xp += quest_def["xp_reward"]
