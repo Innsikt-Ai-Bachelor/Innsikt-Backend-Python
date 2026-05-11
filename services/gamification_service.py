@@ -211,6 +211,8 @@ async def award_xp_and_check_badges(
             UserQuest.quest_id == quest_id,
         )
         if quest_id == "total_sessions":
+            # "total_sessions" is a lifetime quest. Reuse the oldest existing
+            # record so progress/XP is not reset or re-awarded each week.
             quest_query = quest_query.order_by(UserQuest.week_start.asc()).limit(1)
         else:
             quest_query = quest_query.where(UserQuest.week_start == week_start)
